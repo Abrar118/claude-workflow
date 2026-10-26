@@ -1,0 +1,21 @@
+{
+  "name": "prompt-deck",
+  "version": "0.2.0",
+  "description": "Band above the prompt: usage, prompt-cache countdown with compact warning, git health, next-prompt suggestion; /limits pane.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "cacheTtlMinutes": {
+      "type": "string",
+      "title": "Prompt cache TTL (minutes)",
+      "description": "How long the prompt cache lives after the last request",
+      "default": "60",
+      "options": [
+        "60",
+        "5"
+      ]
+    }
+  },
+  "author": {
+    "name": "Abrar118"
+  }
+}

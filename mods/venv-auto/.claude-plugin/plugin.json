@@ -1,0 +1,8 @@
+{
+  "name": "venv-auto",
+  "version": "0.1.0",
+  "description": "Activates the nearest .venv for python, pip and pytest commands, so Claude never has to.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "turn-meter",
+  "version": "0.1.0",
+  "description": "Each turn's duration, tool calls and cost, shown in the prompt-deck band; a toast when a turn costs far more than usual.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Abrar118"
+  }
+}

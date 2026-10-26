@@ -1,0 +1,8 @@
+{
+  "name": "debug-on-paste",
+  "version": "0.1.0",
+  "description": "When a pasted message looks like an error or stack trace, tells Claude to use systematic debugging.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

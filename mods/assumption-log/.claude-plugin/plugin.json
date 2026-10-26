@@ -1,0 +1,9 @@
+{
+  "name": "assumption-log",
+  "version": "0.1.0",
+  "description": "Claude logs each assumption it makes mid-task; a side pane lists them so you can mark them right or wrong, or ask for a change.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Abrar118"
+  }
+}

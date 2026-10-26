@@ -1,0 +1,8 @@
+{
+  "name": "format-on-edit",
+  "version": "0.1.0",
+  "description": "After each edit, runs the project's own formatter on that file: Prettier, dart format or Spotless, only where the project already has it.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

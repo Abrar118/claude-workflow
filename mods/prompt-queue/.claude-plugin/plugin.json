@@ -1,0 +1,9 @@
+{
+  "name": "prompt-queue",
+  "version": "0.1.0",
+  "description": "Queue prompt ideas while Claude works (/add-queue), then send, modify or discard them from a side pane.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Abrar118"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "safety-guard",
+  "version": "0.1.0",
+  "description": "Asks before force pushes, rm -rf, hard resets, DROP statements, flyway clean and .env edits.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "push-preflight",
+  "version": "0.1.0",
+  "description": "Before git push, runs the repo's format:check, lint and typecheck scripts and blocks the push if one fails.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "verify-outside-feedback",
+  "version": "0.1.0",
+  "description": "Check each claim in pasted feedback, reviews or critiques with evidence before agreeing or changing anything.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

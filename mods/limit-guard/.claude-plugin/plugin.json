@@ -1,0 +1,8 @@
+{
+  "name": "limit-guard",
+  "version": "0.1.0",
+  "description": "Warns as the 5-hour limit fills and asks before subagents when it is nearly spent.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

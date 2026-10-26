@@ -1,0 +1,9 @@
+{
+  "name": "agent-panel",
+  "version": "0.1.0",
+  "description": "Always-on activity panel (/subagents): tasks, background jobs, agents, assumptions and a live file tree; a progress band above the prompt.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Abrar118"
+  }
+}

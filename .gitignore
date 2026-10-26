@@ -1,0 +1,5 @@
+.DS_Store
+.remember/
+*.log
+.claude-plugin/types/
+mods/*/.claude-plugin/types/
