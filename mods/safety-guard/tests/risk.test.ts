@@ -157,3 +157,30 @@ test('an unknown branch asks for bare pushes and merges; a second cd makes the b
   expect(asked).toBe(2)
   expect(dirs).not.toContain('/repo/a')
 })
+
+test('any folder change other than one leading cd makes the branch unknown, so it asks', async ($, on) => {
+  let asked = 0
+  on('process.run', () => ({ value: { exitCode: 0, stdout: 'feat\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.cwd', () => ({ value: '/repo' }))
+  on('tool.call', ($, e) => {
+    if (e.tool === 'AskUserQuestion') {
+      asked++
+      return { deny: 'dismissed' }
+    }
+    return { result: 'ran' }
+  })
+  const sneaky = ['true && cd x && git merge feat', '(cd x; git merge feat)', 'pushd x && git merge feat', 'GIT_DIR=/x/.git git merge feat', 'git --git-dir=/x/.git merge feat', 'git --work-tree=/x merge feat', 'git -c a=b -C /x merge feat']
+  for (const command of sneaky) await $.tool.call({ tool: 'Bash', command } as never)
+  expect(asked).toBe(sneaky.length)
+  // One leading cd into a feature branch still runs without asking.
+  await $.tool.call({ tool: 'Bash', command: 'cd x && git merge main' } as never)
+  expect(asked).toBe(sneaky.length)
+})
+
+test('git options before the subcommand do not hide it', () => {
+  expect(risk('git -C /x push --force origin a')).toBe('force push')
+  expect(risk('git -c core.x=1 push origin main')).toBe('push to main')
+  expect(risk('git --git-dir /x/.git push origin main')).toBe('push to main')
+  expect(isMerge('git --work-tree=/x merge feat')).toBe(true)
+  expect(isBarePush('git -C /x push')).toBe(true)
+})

@@ -29,19 +29,26 @@ const BARE_PUSH = /\bgit\s+push(\s+-\S+)*(\s+(?!-)[^\s;&|]+(\s+HEAD)?)?(\s+[12]?
 const ENV_FILE = /(^|\/)\.env(?!\.(example|sample|template)$)(\.[^/]+)?$/i
 export const isEnvFile = (path: string) => ENV_FILE.test(path)
 
+// `git -C x push`, `git -c k=v merge`, `git --git-dir=x push`: drop git's own options so the checks see `git push`.
+const GIT_OPTS = /\bgit((?:\s+(?:-[cC]\s+\S+|--(?:git-dir|work-tree|namespace|exec-path)\s+\S+|--[\w-]+(?:=\S+)?|-[pP]))+)(?=\s)/g
+const plain = (command: string) => command.replace(GIT_OPTS, 'git')
+
 export const writesEnvFile = (command: string) => [...command.matchAll(WRITE_TARGET)].some(m => isEnvFile(m[1]!))
-export const isMerge = (command: string) => MERGE.test(command)
+export const isMerge = (command: string) => MERGE.test(plain(command))
 export const risk = (command: string) =>
-  RISKY.find(([r]) => r.test(command))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
+  RISKY.find(([r]) => r.test(plain(command)))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
 export const isProdCompose = (command: string) => PROD_COMPOSE.test(command)
-export const isBarePush = (command: string) => BARE_PUSH.test(command)
+export const isBarePush = (command: string) => BARE_PUSH.test(plain(command))
 
 // Risks that depend on where the command runs: the branch it pushes, or a folder with a dev compose file.
-// The folder the command runs in: a leading `cd <dir> &&`, else the session's folder.
-// Null when it can't be told: a second cd, or git -C.
+// The folder the command runs in: one leading `cd <dir> &&`, else the session's folder.
+// Null (unknown, so the guard asks) for any other way of changing folder or repo:
+// a later or second cd, pushd, git -C, --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE.
+const ELSEWHERE = /\bpushd\b|\bgit\b[^;&|\n]*\s-C\b|--git-dir\b|--work-tree\b|\bGIT_(DIR|WORK_TREE)=/
 const dirOf = (command: string, cwd: string): string | null => {
-  if ((command.match(/(^|[;&|(]\s*)cd\s/g) ?? []).length > 1 || /\bgit\s+-C\b/.test(command)) return null
+  const cds = (command.match(/(?<![\w.-])cd(?![\w.-])/g) ?? []).length
   const m = /^\s*cd\s+("([^"]+)"|'([^']+)'|(\S+))\s*&&/.exec(command)
+  if (ELSEWHERE.test(command) || cds > 1 || (cds === 1 && !m)) return null
   const dir = m ? (m[2] ?? m[3] ?? m[4]!) : ''
   return !dir ? cwd : dir.startsWith('/') ? dir : `${cwd}/${dir}`
 }
