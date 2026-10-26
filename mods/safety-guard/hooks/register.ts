@@ -1,50 +1,46 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 const RISKY: [RegExp, string][] = [
-  // includes the +refspec form (`git push origin +main`)
+  // Every git rule reads `git ... <subcommand>`: options before the subcommand (`-C x`, `-c k=v`) never hide it.
   // -f alone or in a cluster (`-fu`), --force, --force-with-lease, or a +refspec (`git push origin +main`)
-  [/\bgit\s+push\b[^;&|\n]*(\s--force\b|\s-[a-zA-Z]*f[a-zA-Z]*(?![\w-])|--force-with-lease|\s\+[\w./-])/, 'force push'],
+  [/\bgit\b[^;&|\n]*?\spush\b[^;&|\n]*(\s--force\b|\s-[a-zA-Z]*f[a-zA-Z]*(?![\w-])|--force-with-lease|\s\+[\w./-])/, 'force push'],
   // -r / -R / -rf / -Rf / -r -f / --recursive anywhere in the flags; not `git rm`, not `docker run --rm`
   [/(?<![\w.-])(?<!\bgit\s)rm\s(?:[^;&|\n]*\s)?(-[fiIdv]*[rR][fiIrRdv]*|--recursive)(?![\w-])/, 'recursive delete'],
-  [/\bgit\s+reset\s+--hard\b/, 'hard reset'],
-  [/\bgit\s+(clean\s+-[a-zA-Z]*f|checkout\s+--\s+\.)/, 'discard local files'],
+  [/\bgit\b[^;&|\n]*?\sreset\s+--hard\b/, 'hard reset'],
+  [/\bgit\b[^;&|\n]*?\s(clean\s+-[a-zA-Z]*f|checkout\s+--\s+\.)/, 'discard local files'],
   [/\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b/i, 'destructive SQL'],
   [/\bflyway\s*clean\b|\bflyway\b.*\bclean\b|flywayClean/i, 'flyway clean'],
   // the branch name must end there: `main-menu` and `master-plan` are not main
-  [/\bgit\s+push\b[^;&|\n]*\s\+?(\S+:)?(refs\/heads\/)?(main|master)(?![\w./-])/, 'push to main'],
+  [/\bgit\b[^;&|\n]*?\spush\b[^;&|\n]*\s\+?(\S+:)?(refs\/heads\/)?(main|master)(?![\w./-])/, 'push to main'],
   // Merging a PR lands it on its base branch, usually main: always ask.
-  [/\bgh\s+pr\s+merge\b|\bgh\s+api\b[^;&|\n]*\/(pulls\/\d+\/merge|merges)\b/, 'PR merge'],
+  [/\bgh\b[^;&|\n]*?\spr\s+merge\b|\bgh\b[^;&|\n]*?\sapi\b[^;&|\n]*\/(pulls\/\d+\/merge|merges)\b/, 'PR merge'],
   // Switching to main and merging in one command.
-  [/\bgit\s+(checkout|switch)\s+(main|master)(?![\w./-])[^\n]*\bgit\s+merge(?![\w-])/, 'merge into main'],
+  [/\bgit\b[^;&|\n]*?\s(checkout|switch)\s+(main|master)(?![\w./-])[^\n]*\bgit\b[^;&|\n]*?\smerge(?![\w-])/, 'merge into main'],
 ]
 // A merge that changes the current branch: not `git merge --abort`/`--quit` (only right after merge), not `git merge-base`.
-const MERGE = /\bgit\s+merge(?![\w-])(?!\s+--(abort|quit)\b)/
+const MERGE = /\bgit\b[^;&|\n]*?\smerge(?![\w-])(?!\s+--(abort|quit)\b)/
 // Where a shell redirect or tee writes: `> .env`, `>> /p/.env.local`, `tee -a ".env"`. Not `2>&1`.
 const WRITE_TARGET = /(?:[^<>&\d]>>?|\btee(?:\s+-a)?)\s*["']?([^\s;&|"'<>]+)/g
 // `docker compose up` on the default file, or a named file that is not the dev one.
 const PROD_COMPOSE = /(^|[;&|(]\s*|\bsudo\s+)docker[- ]compose\b(?![^;&|]*\s-f\s+\S*dev)[^;&|]*\bup\b/
 // No refspec named, so it pushes the current branch: any flags or remote, optional HEAD and redirects.
-const BARE_PUSH = /\bgit\s+push(\s+-\S+)*(\s+(?!-)[^\s;&|]+(\s+HEAD)?)?(\s+[12]?>>?&?\s*\S+)*\s*($|[;&|\n])/
+const BARE_PUSH = /\bgit\b[^;&|\n]*?\spush(\s+-\S+)*(\s+(?!-)[^\s;&|]+(\s+HEAD)?)?(\s+[12]?>>?&?\s*\S+)*\s*($|[;&|\n])/
 // .env and .env.local etc., but not the committed .env.example / .sample / .template
 const ENV_FILE = /(^|\/)\.env(?!\.(example|sample|template)$)(\.[^/]+)?$/i
 export const isEnvFile = (path: string) => ENV_FILE.test(path)
 
-// `git -C x push`, `git -c k=v merge`, `git --git-dir=x push`: drop git's own options so the checks see `git push`.
-const GIT_OPTS = /\bgit((?:\s+(?:-[cC]\s+\S+|--(?:git-dir|work-tree|namespace|exec-path)\s+\S+|--[\w-]+(?:=\S+)?|-[pP]))+)(?=\s)/g
-const plain = (command: string) => command.replace(GIT_OPTS, 'git')
-
 export const writesEnvFile = (command: string) => [...command.matchAll(WRITE_TARGET)].some(m => isEnvFile(m[1]!))
-export const isMerge = (command: string) => MERGE.test(plain(command))
+export const isMerge = (command: string) => MERGE.test(command)
 export const risk = (command: string) =>
-  RISKY.find(([r]) => r.test(plain(command)))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
+  RISKY.find(([r]) => r.test(command))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
 export const isProdCompose = (command: string) => PROD_COMPOSE.test(command)
-export const isBarePush = (command: string) => BARE_PUSH.test(plain(command))
+export const isBarePush = (command: string) => BARE_PUSH.test(command)
 
 // Risks that depend on where the command runs: the branch it pushes, or a folder with a dev compose file.
 // The folder the command runs in: one leading `cd <dir> &&`, else the session's folder.
 // Null (unknown, so the guard asks) for any other way of changing folder or repo:
-// a later or second cd, pushd, git -C, --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE.
-const ELSEWHERE = /\bpushd\b|\bgit\b[^;&|\n]*\s-C\b|--git-dir\b|--work-tree\b|\bGIT_(DIR|WORK_TREE)=/
+// a later or second cd, pushd, any -C or --chdir (git -C, env -C), --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE.
+const ELSEWHERE = /\bpushd\b|\s-C\b|--chdir\b|--git-dir\b|--work-tree\b|\bGIT_(DIR|WORK_TREE)=/
 const dirOf = (command: string, cwd: string): string | null => {
   const cds = (command.match(/(?<![\w.-])cd(?![\w.-])/g) ?? []).length
   const m = /^\s*cd\s+("([^"]+)"|'([^']+)'|(\S+))\s*&&/.exec(command)

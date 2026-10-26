@@ -184,3 +184,28 @@ test('git options before the subcommand do not hide it', () => {
   expect(isMerge('git --work-tree=/x merge feat')).toBe(true)
   expect(isBarePush('git -C /x push')).toBe(true)
 })
+
+test('git options never hide another command or a push', () => {
+  expect(risk('git -C x;rm -rf /')).toBe('recursive delete')
+  expect(risk('git --config-env a=B push --force origin x')).toBe('force push')
+  expect(risk('git -C "a b" push --force origin x')).toBe('force push')
+  expect(risk('gh -R o/r pr merge 3')).toBe('PR merge')
+  expect(isMerge('git log --merges')).toBe(false)
+  expect(isMerge('git branch --merged')).toBe(false)
+})
+
+test('env -C and --chdir make the branch unknown, so it asks', async ($, on) => {
+  let asked = 0
+  on('process.run', () => ({ value: { exitCode: 0, stdout: 'feat\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.cwd', () => ({ value: '/repo' }))
+  on('tool.call', ($, e) => {
+    if (e.tool === 'AskUserQuestion') {
+      asked++
+      return { deny: 'dismissed' }
+    }
+    return { result: 'ran' }
+  })
+  for (const command of ['env -C /x git merge feat', 'env --chdir=/x git merge feat', 'env --chdir /x git push'])
+    await $.tool.call({ tool: 'Bash', command } as never)
+  expect(asked).toBe(3)
+})
