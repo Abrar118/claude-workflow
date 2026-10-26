@@ -29,12 +29,15 @@ const BARE_PUSH = /\bgit\b[^;&|\n]*?\spush(\s+-\S+)*(\s+(?!-)[^\s;&|]+(\s+HEAD)?
 const ENV_FILE = /(^|\/)\.env(?!\.(example|sample|template)$)(\.[^/]+)?$/i
 export const isEnvFile = (path: string) => ENV_FILE.test(path)
 
+// Separators inside quotes don't end a command: blank them so `git -c "a;b" push` still reads as one command.
+const flat = (command: string) => command.replace(/"[^"]*"|'[^']*'/g, q => q.replace(/[;&|\n]/g, ' '))
+
 export const writesEnvFile = (command: string) => [...command.matchAll(WRITE_TARGET)].some(m => isEnvFile(m[1]!))
-export const isMerge = (command: string) => MERGE.test(command)
+export const isMerge = (command: string) => MERGE.test(flat(command))
 export const risk = (command: string) =>
-  RISKY.find(([r]) => r.test(command))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
+  RISKY.find(([r]) => r.test(flat(command)))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
 export const isProdCompose = (command: string) => PROD_COMPOSE.test(command)
-export const isBarePush = (command: string) => BARE_PUSH.test(command)
+export const isBarePush = (command: string) => BARE_PUSH.test(flat(command))
 
 // Risks that depend on where the command runs: the branch it pushes, or a folder with a dev compose file.
 // The folder the command runs in: one leading `cd <dir> &&`, else the session's folder.

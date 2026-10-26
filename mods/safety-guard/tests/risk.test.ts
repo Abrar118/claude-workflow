@@ -209,3 +209,12 @@ test('env -C and --chdir make the branch unknown, so it asks', async ($, on) => 
     await $.tool.call({ tool: 'Bash', command } as never)
   expect(asked).toBe(3)
 })
+
+test('a ; & or | inside quotes does not split the command', () => {
+  expect(risk(`git -c "x=a;b" push --force origin x`)).toBe('force push')
+  expect(risk(`git -c 'x=a|b' reset --hard`)).toBe('hard reset')
+  expect(risk(`gh -R "o/r&x" pr merge 3`)).toBe('PR merge')
+  expect(isMerge(`git -c "a=1;2" merge feat`)).toBe(true)
+  expect(isBarePush(`git -c "a=1&2" push`)).toBe(true)
+  expect(risk('git status; echo ok')).toBeUndefined()
+})
