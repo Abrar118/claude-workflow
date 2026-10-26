@@ -21,7 +21,8 @@ const read = ($: EngineInterface, path: string) => ($.fs.read(path) as Promise<s
 /** Picks the project's own formatter for a file, or null when the project has none set up.
  * Only files and projects inside the session's folder count: a formatter runs the project's own code. */
 export async function formatterFor($: EngineInterface, file: string): Promise<Formatter | null> {
-  if (file.includes('/node_modules/') || file.includes('/build/')) return null
+  // `.` or `..` segments could climb out of the session folder after the check below.
+  if (file.includes('/node_modules/') || file.includes('/build/') || /\/\.\.?(\/|$)/.test(file)) return null
   const root = (await $.session.cwd()).replace(/(.)\/+$/, '$1')
   if (!inside(file, root)) return null
   const dir = parent(file)

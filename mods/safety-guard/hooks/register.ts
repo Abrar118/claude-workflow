@@ -17,8 +17,8 @@ const RISKY: [RegExp, string][] = [
   // Switching to main and merging in one command.
   [/\bgit\s+(checkout|switch)\s+(main|master)(?![\w./-])[^\n]*\bgit\s+merge(?![\w-])/, 'merge into main'],
 ]
-// A merge that changes the current branch (not `--abort`/`--quit`, not `git merge-base`).
-const MERGE = /\bgit\s+merge(?![\w-])(?![^;&|\n]*\s--(abort|quit)\b)/
+// A merge that changes the current branch: not `git merge --abort`/`--quit` (only right after merge), not `git merge-base`.
+const MERGE = /\bgit\s+merge(?![\w-])(?!\s+--(abort|quit)\b)/
 // Where a shell redirect or tee writes: `> .env`, `>> /p/.env.local`, `tee -a ".env"`. Not `2>&1`.
 const WRITE_TARGET = /(?:[^<>&\d]>>?|\btee(?:\s+-a)?)\s*["']?([^\s;&|"'<>]+)/g
 // `docker compose up` on the default file, or a named file that is not the dev one.
@@ -38,14 +38,17 @@ export const isBarePush = (command: string) => BARE_PUSH.test(command)
 
 // Risks that depend on where the command runs: the branch it pushes, or a folder with a dev compose file.
 // The folder the command runs in: a leading `cd <dir> &&`, else the session's folder.
-const dirOf = (command: string, cwd: string) => {
+// Null when it can't be told: a second cd, or git -C.
+const dirOf = (command: string, cwd: string): string | null => {
+  if ((command.match(/(^|[;&|(]\s*)cd\s/g) ?? []).length > 1 || /\bgit\s+-C\b/.test(command)) return null
   const m = /^\s*cd\s+("([^"]+)"|'([^']+)'|(\S+))\s*&&/.exec(command)
   const dir = m ? (m[2] ?? m[3] ?? m[4]!) : ''
   return !dir ? cwd : dir.startsWith('/') ? dir : `${cwd}/${dir}`
 }
 
 // The checked-out branch, or null when git can't tell.
-async function branchIn($: EngineInterface, dir: string): Promise<string | null> {
+async function branchIn($: EngineInterface, dir: string | null): Promise<string | null> {
+  if (dir === null) return null
   const r = await $.process.run(['git', '-C', dir, 'rev-parse', '--abbrev-ref', 'HEAD']).catch(() => null)
   return r && r.exitCode === 0 ? r.stdout.trim() : null
 }
@@ -53,7 +56,11 @@ async function branchIn($: EngineInterface, dir: string): Promise<string | null>
 async function contextRisk($: EngineInterface, command: string): Promise<string | undefined> {
   const cwd = await $.session.cwd()
   const dir = dirOf(command, cwd)
-  if (isBarePush(command) && /^(main|master)$/.test((await branchIn($, dir)) ?? '')) return 'push to main'
+  if (isBarePush(command)) {
+    const branch = await branchIn($, dir)
+    if (branch === null) return 'push (could not tell which branch it pushes)'
+    if (/^(main|master)$/.test(branch)) return 'push to main'
+  }
   if (isMerge(command)) {
     const branch = await branchIn($, dir)
     if (branch === null) return 'merge (could not tell which branch it merges into)'

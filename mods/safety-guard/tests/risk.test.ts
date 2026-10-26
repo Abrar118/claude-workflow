@@ -128,3 +128,32 @@ test('the GitHub merge-PR tool asks first', async ($, on) => {
   expect(asked).toBe(1)
   expect(JSON.stringify(r)).toMatch(/blocked/)
 })
+
+test('--abort counts only right after merge, not inside a message', () => {
+  expect(isMerge('git merge feat -m "x --abort"')).toBe(true)
+  expect(isMerge('git merge --abort')).toBe(false)
+  expect(isMerge('git merge --continue')).toBe(true)
+})
+
+test('an unknown branch asks for bare pushes and merges; a second cd makes the branch unknown', async ($, on) => {
+  const dirs: string[] = []
+  let asked = 0
+  on('process.run', ($, e) => {
+    const argv = (e as unknown as { argv: string[] }).argv
+    dirs.push(argv[2]!)
+    return { value: { exitCode: 128, stdout: '', stderr: 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('session.cwd', () => ({ value: '/repo' }))
+  on('tool.call', ($, e) => {
+    if (e.tool === 'AskUserQuestion') {
+      asked++
+      return { deny: 'dismissed' }
+    }
+    return { result: 'ran' }
+  })
+  await $.tool.call({ tool: 'Bash', command: 'git push' } as never)
+  expect(asked).toBe(1)
+  await $.tool.call({ tool: 'Bash', command: 'cd a && cd b && git merge feat' } as never)
+  expect(asked).toBe(2)
+  expect(dirs).not.toContain('/repo/a')
+})

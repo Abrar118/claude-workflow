@@ -43,3 +43,17 @@ test('only files inside the session folder are formatted, by a project inside it
   await $.tool.call({ tool: 'Edit', file_path: '/work/app/src/a.ts', old_string: 'a', new_string: 'b' } as never)
   expect(runs.length).toBe(0)
 })
+
+test('a path that climbs out with .. is not formatted', async ($, on) => {
+  on('session.cwd', () => ({ value: '/work/app' }))
+  const files = new Set(['/other/package.json', '/other/node_modules/.bin/prettier', '/work/app/../../other/package.json', '/work/app/../../other/node_modules/.bin/prettier'])
+  on('fs.exists', ($, e) => ({ value: files.has((e as unknown as { path: string }).path) }) as never)
+  const runs: string[][] = []
+  on('process.run', ($, e) => {
+    runs.push((e as unknown as { argv: string[] }).argv)
+    return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('tool.call', () => ({ result: 'ok' }))
+  await $.tool.call({ tool: 'Edit', file_path: '/work/app/../../other/a.ts', old_string: 'a', new_string: 'b' } as never)
+  expect(runs.length).toBe(0)
+})
