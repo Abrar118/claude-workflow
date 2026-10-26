@@ -9,7 +9,7 @@
     { "name": "prompt-queue", "source": "./mods/prompt-queue", "description": "Queue prompt ideas while Claude works (/add-queue), send or discard them later." },
     { "name": "turn-meter", "source": "./mods/turn-meter", "description": "Duration, tool calls and cost for each turn; shown in the prompt-deck band." },
     { "name": "limit-guard", "source": "./mods/limit-guard", "description": "Warns as the 5-hour limit fills; asks before subagents when nearly spent." },
-    { "name": "safety-guard", "source": "./mods/safety-guard", "description": "Asks before force pushes, rm -rf, hard resets, DROP statements and .env edits." },
+    { "name": "safety-guard", "source": "./mods/safety-guard", "description": "Asks before force pushes, pushes and merges into main, PR merges, rm -rf, hard resets, DROP statements and .env writes." },
     { "name": "push-preflight", "source": "./mods/push-preflight", "description": "Runs the repo's format, lint and typecheck scripts before git push." },
     { "name": "format-on-edit", "source": "./mods/format-on-edit", "description": "Runs the project's own formatter on each edited file." },
     { "name": "venv-auto", "source": "./mods/venv-auto", "description": "Activates the nearest .venv for python, pip and pytest." },

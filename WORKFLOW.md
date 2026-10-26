@@ -12,7 +12,7 @@ How I work with Claude Code day to day, and where each mod, skill and plugin fit
 | 4. Queue | New ideas while Claude is busy go into a queue instead of interrupting. | **prompt-queue** (`/add-queue`) |
 | 5. Debug | When I paste an error, Claude switches to step-by-step debugging instead of guessing. | **debug-on-paste**, `superpowers:systematic-debugging` |
 | 6. Review | Claude reviews the diff. If I paste outside feedback, every claim gets checked with evidence before anything changes. | `/code-review`, **verify-outside-feedback** |
-| 7. Ship | Formatting runs on every edit. Lint, typecheck and format checks run before a push. Risky commands need my OK. | **format-on-edit**, **push-preflight**, **safety-guard** |
+| 7. Ship | Formatting runs on every edit. Lint, typecheck and format checks run before a push. Risky commands, pushes to main and any merge into main need my OK. | **format-on-edit**, **push-preflight**, **safety-guard** |
 
 ## Watching cost and limits
 

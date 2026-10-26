@@ -48,7 +48,7 @@ Mods are Claude Code plugins that change the interface or hook into what Claude 
 | **prompt-queue** | `/add-queue` saves a prompt idea while Claude works. `/queue` opens a pane to send, modify or discard them. |
 | **turn-meter** | Time, tool calls and cost for each turn, shown in the prompt-deck band, plus a toast when a turn costs far more than usual. |
 | **limit-guard** | Warns as the 5-hour limit fills up, and asks before starting subagents when it is nearly used up. |
-| **safety-guard** | Asks before force pushes, pushes to main, `rm -rf`, hard resets, `DROP`/`TRUNCATE`, `flyway clean` and `.env` edits. |
+| **safety-guard** | Asks before force pushes, pushes to main, merges into main (`git merge` while on main, `gh pr merge`, the GitHub merge-PR tool), `rm -rf`, hard resets, `DROP`/`TRUNCATE`, `flyway clean` and `.env` edits or shell writes. Block is the default answer. |
 | **push-preflight** | Before `git push`, runs the repo's `format:check`, `lint` and `typecheck` scripts, and blocks the push if one fails. |
 | **format-on-edit** | After each edit, runs the project's own formatter (Prettier, `dart format` or Spotless), only where the project already uses one. |
 | **venv-auto** | Activates the nearest `.venv` for `python`, `pip` and `pytest` commands. |

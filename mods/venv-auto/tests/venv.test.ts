@@ -27,5 +27,19 @@ test('the command is prefixed with the nearest venv', async ($, on) => {
     return { result: 'ok' }
   })
   await $.tool.call({ tool: 'Bash', command: 'python train.py' } as never)
-  expect(ran).toBe('source "/thesis/code/.venv/bin/activate" && python train.py')
+  expect(ran).toBe("source '/thesis/code/.venv/bin/activate' && python train.py")
+})
+
+test('a folder name with shell characters stays a plain path', async ($, on) => {
+  const dir = `/w/x"$(touch pwned)"'q`
+  on('session.cwd', () => ({ value: dir }))
+  on('fs.exists', ($, e) => ({ value: (e as unknown as { path: string }).path === `${dir}/.venv/bin/activate` }) as never)
+  on('process.run', () => ({ value: { exitCode: 0, stdout: '/Users/me', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  let ran = ''
+  on('tool.call', ($, e) => {
+    ran = (e as unknown as { command: string }).command
+    return { result: 'ok' }
+  })
+  await $.tool.call({ tool: 'Bash', command: 'pytest' } as never)
+  expect(ran).toBe(`source '/w/x"$(touch pwned)"'\\''q/.venv/bin/activate' && pytest`)
 })

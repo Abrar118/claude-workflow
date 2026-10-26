@@ -2,7 +2,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 const RISKY: [RegExp, string][] = [
   // includes the +refspec form (`git push origin +main`)
-  [/\bgit\s+push\b[^;&|\n]*(\s--force\b|\s-f\b|--force-with-lease|\s\+[\w./-])/, 'force push'],
+  // -f alone or in a cluster (`-fu`), --force, --force-with-lease, or a +refspec (`git push origin +main`)
+  [/\bgit\s+push\b[^;&|\n]*(\s--force\b|\s-[a-zA-Z]*f[a-zA-Z]*(?![\w-])|--force-with-lease|\s\+[\w./-])/, 'force push'],
   // -r / -R / -rf / -Rf / -r -f / --recursive anywhere in the flags; not `git rm`, not `docker run --rm`
   [/(?<![\w.-])(?<!\bgit\s)rm\s(?:[^;&|\n]*\s)?(-[fiIdv]*[rR][fiIrRdv]*|--recursive)(?![\w-])/, 'recursive delete'],
   [/\bgit\s+reset\s+--hard\b/, 'hard reset'],
@@ -10,8 +11,16 @@ const RISKY: [RegExp, string][] = [
   [/\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b/i, 'destructive SQL'],
   [/\bflyway\s*clean\b|\bflyway\b.*\bclean\b|flywayClean/i, 'flyway clean'],
   // the branch name must end there: `main-menu` and `master-plan` are not main
-  [/\bgit\s+push\b[^;&|\n]*\s\+?(\S+:)?(main|master)(?![\w./-])/, 'push to main'],
+  [/\bgit\s+push\b[^;&|\n]*\s\+?(\S+:)?(refs\/heads\/)?(main|master)(?![\w./-])/, 'push to main'],
+  // Merging a PR lands it on its base branch, usually main: always ask.
+  [/\bgh\s+pr\s+merge\b|\bgh\s+api\b[^;&|\n]*\/(pulls\/\d+\/merge|merges)\b/, 'PR merge'],
+  // Switching to main and merging in one command.
+  [/\bgit\s+(checkout|switch)\s+(main|master)(?![\w./-])[^\n]*\bgit\s+merge(?![\w-])/, 'merge into main'],
 ]
+// A merge that changes the current branch (not `--abort`/`--quit`, not `git merge-base`).
+const MERGE = /\bgit\s+merge(?![\w-])(?![^;&|\n]*\s--(abort|quit)\b)/
+// Where a shell redirect or tee writes: `> .env`, `>> /p/.env.local`, `tee -a ".env"`. Not `2>&1`.
+const WRITE_TARGET = /(?:[^<>&\d]>>?|\btee(?:\s+-a)?)\s*["']?([^\s;&|"'<>]+)/g
 // `docker compose up` on the default file, or a named file that is not the dev one.
 const PROD_COMPOSE = /(^|[;&|(]\s*|\bsudo\s+)docker[- ]compose\b(?![^;&|]*\s-f\s+\S*dev)[^;&|]*\bup\b/
 // No refspec named, so it pushes the current branch: any flags or remote, optional HEAD and redirects.
@@ -20,16 +29,35 @@ const BARE_PUSH = /\bgit\s+push(\s+-\S+)*(\s+(?!-)[^\s;&|]+(\s+HEAD)?)?(\s+[12]?
 const ENV_FILE = /(^|\/)\.env(?!\.(example|sample|template)$)(\.[^/]+)?$/i
 export const isEnvFile = (path: string) => ENV_FILE.test(path)
 
-export const risk = (command: string) => RISKY.find(([r]) => r.test(command))?.[1]
+export const writesEnvFile = (command: string) => [...command.matchAll(WRITE_TARGET)].some(m => isEnvFile(m[1]!))
+export const isMerge = (command: string) => MERGE.test(command)
+export const risk = (command: string) =>
+  RISKY.find(([r]) => r.test(command))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
 export const isProdCompose = (command: string) => PROD_COMPOSE.test(command)
 export const isBarePush = (command: string) => BARE_PUSH.test(command)
 
 // Risks that depend on where the command runs: the branch it pushes, or a folder with a dev compose file.
+// The folder the command runs in: a leading `cd <dir> &&`, else the session's folder.
+const dirOf = (command: string, cwd: string) => {
+  const m = /^\s*cd\s+("([^"]+)"|'([^']+)'|(\S+))\s*&&/.exec(command)
+  const dir = m ? (m[2] ?? m[3] ?? m[4]!) : ''
+  return !dir ? cwd : dir.startsWith('/') ? dir : `${cwd}/${dir}`
+}
+
+// The checked-out branch, or null when git can't tell.
+async function branchIn($: EngineInterface, dir: string): Promise<string | null> {
+  const r = await $.process.run(['git', '-C', dir, 'rev-parse', '--abbrev-ref', 'HEAD']).catch(() => null)
+  return r && r.exitCode === 0 ? r.stdout.trim() : null
+}
+
 async function contextRisk($: EngineInterface, command: string): Promise<string | undefined> {
   const cwd = await $.session.cwd()
-  if (isBarePush(command)) {
-    const r = await $.process.run(['git', '-C', cwd, 'rev-parse', '--abbrev-ref', 'HEAD']).catch(() => null)
-    if (r && /^(main|master)$/.test(r.stdout.trim())) return 'push to main'
+  const dir = dirOf(command, cwd)
+  if (isBarePush(command) && /^(main|master)$/.test((await branchIn($, dir)) ?? '')) return 'push to main'
+  if (isMerge(command)) {
+    const branch = await branchIn($, dir)
+    if (branch === null) return 'merge (could not tell which branch it merges into)'
+    if (/^(main|master)$/.test(branch)) return 'merge into main'
   }
   if (isProdCompose(command) && (await $.fs.exists(`${cwd}/docker-compose-dev.yml`).catch(() => false))) return 'production docker compose up (this folder has docker-compose-dev.yml)'
   return undefined
@@ -49,4 +77,12 @@ export const register: Register = on => {
     const answer = await $.ui.ask(`Claude wants to change ${e.file_path}. Allow it?`, ['Block', 'Allow']).catch(() => 'Block')
     return answer === 'Allow' ? next(e) : { deny: `safety-guard: the user blocked editing ${e.file_path}.` }
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'safety-guard: its check failed, so the edit was blocked.' }))
+
+  // The GitHub MCP server's merge tool: merging a PR always needs the person's OK.
+  on('tool.call', { tool: /merge_pull_request$/ }, async ($, e, next) => {
+    const pr = e as unknown as { owner?: string; repo?: string; pullNumber?: number }
+    const which = pr.repo ? ` ${pr.owner}/${pr.repo}#${pr.pullNumber}` : ''
+    const answer = await $.ui.ask(`Claude wants to merge pull request${which}. Allow it?`, ['Block', 'Allow']).catch(() => 'Block')
+    return answer === 'Allow' ? next(e) : { deny: `safety-guard: the user blocked merging pull request${which}.` }
+  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'safety-guard: its check failed, so the merge was blocked.' }))
 }

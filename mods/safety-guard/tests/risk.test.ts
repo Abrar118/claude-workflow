@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { isBarePush, isEnvFile, isProdCompose, risk } from '../hooks/register'
+import { isBarePush, isEnvFile, isMerge, isProdCompose, risk } from '../hooks/register'
 
 test('risky commands are named; safe ones pass', () => {
   expect(risk('git push --force origin main')).toBe('force push')
@@ -68,4 +68,63 @@ test('Block is the first option, and a failing check blocks', async ($, on) => {
   // A bare push asks for the cwd; that failing must block, not let the push through.
   const failed = await $.tool.call({ tool: 'Bash', command: 'git push' } as never)
   expect(JSON.stringify(failed)).toMatch(/check failed/)
+})
+
+test('force flags inside a cluster and refs/heads/main are caught', () => {
+  for (const c of ['git push -fu origin feat', 'git push -uf origin feat']) expect(risk(c)).toBe('force push')
+  expect(risk('git push origin HEAD:refs/heads/main')).toBe('push to main')
+  expect(risk('git push --follow-tags origin feat')).toBeUndefined()
+  expect(risk('git push -u origin feat')).toBeUndefined()
+})
+
+test('shell writes to .env files are caught; templates and reads are not', () => {
+  for (const c of ['echo A=1 > .env', 'echo A=1 >> /p/.env.local', 'printf x | tee .env', 'printf x | tee -a "/p/.env"'])
+    expect(risk(c)).toBe('.env write')
+  for (const c of ['echo A=1 > .env.example', 'cat .env', 'cp .env.example .envrc']) expect(risk(c)).toBeUndefined()
+})
+
+test('PR merges are always caught; merges into main by name are caught', () => {
+  for (const c of ['gh pr merge 12 --squash', 'gh pr merge --auto', 'gh api -X PUT repos/o/r/pulls/12/merge'])
+    expect(risk(c)).toBe('PR merge')
+  for (const c of ['git checkout main && git merge feat', 'git switch master && git merge --no-ff feat'])
+    expect(risk(c)).toBe('merge into main')
+  expect(risk('git checkout main-menu && git merge feat')).toBeUndefined()
+  expect(isMerge('git merge feat')).toBe(true)
+  expect(isMerge('git merge --abort')).toBe(false)
+  expect(isMerge('git merge-base a b')).toBe(false)
+})
+
+test('a git merge while on main asks; on a feature branch it runs', async ($, on) => {
+  let branch = 'main'
+  let asked = 0
+  on('process.run', () => ({ value: { exitCode: 0, stdout: `${branch}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('session.cwd', () => ({ value: '/repo' }))
+  on('tool.call', ($, e) => {
+    if (e.tool === 'AskUserQuestion') {
+      asked++
+      return { deny: 'dismissed' }
+    }
+    return { result: 'ran' }
+  })
+  const blocked = await $.tool.call({ tool: 'Bash', command: 'git merge feat' } as never)
+  expect(asked).toBe(1)
+  expect(JSON.stringify(blocked)).toMatch(/blocked this merge into main/)
+  branch = 'feat'
+  const ran = await $.tool.call({ tool: 'Bash', command: 'git merge main' } as never)
+  expect(asked).toBe(1)
+  expect(JSON.stringify(ran)).toMatch(/ran/)
+})
+
+test('the GitHub merge-PR tool asks first', async ($, on) => {
+  let asked = 0
+  on('tool.call', ($, e) => {
+    if (e.tool === 'AskUserQuestion') {
+      asked++
+      return { deny: 'dismissed' }
+    }
+    return { result: 'merged' }
+  })
+  const r = await $.tool.call({ tool: 'mcp__plugin_github_github__merge_pull_request', owner: 'o', repo: 'r', pullNumber: 1 } as never)
+  expect(asked).toBe(1)
+  expect(JSON.stringify(r)).toMatch(/blocked/)
 })

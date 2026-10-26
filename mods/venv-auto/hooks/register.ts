@@ -39,6 +39,7 @@ export const register: Register = on => {
     const cmd = e.command.replace(/^(\s*cd\s+)~(?=\/|\s)/, `$1${home}`)
     const venv = await findVenv($, dirOf(cmd, await $.session.cwd()))
     if (!venv) return next(e)
-    return next({ ...e, command: `source "${venv}/bin/activate" && ${e.command}` })
+    // Single quotes so a folder name can't run anything; a ' inside becomes '\''.
+    return next({ ...e, command: `source '${`${venv}/bin/activate`.replace(/'/g, `'\\''`)}' && ${e.command}` })
   })
 }
