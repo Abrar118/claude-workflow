@@ -218,3 +218,8 @@ test('a ; & or | inside quotes does not split the command', () => {
   expect(isBarePush(`git -c "a=1&2" push`)).toBe(true)
   expect(risk('git status; echo ok')).toBeUndefined()
 })
+
+test('blanking quoted separators never hides what the raw command shows', () => {
+  expect(risk(`bash -c "git;rm -rf /"`)).toBe('recursive delete')
+  expect(isBarePush(`sh -c "git push;"`)).toBe(true)
+})
