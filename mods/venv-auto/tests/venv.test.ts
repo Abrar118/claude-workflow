@@ -2,6 +2,9 @@ import { expect, test } from 'claude-code/testing'
 
 import { dirOf, needsVenv } from '../hooks/register'
 
+// On Windows the engine hands fs hooks native paths (`/app/x` arrives as `C:\app\x`): compare in POSIX form.
+const posix = (p: string) => p.replaceAll('\\', '/').replace(/^[A-Za-z]:(?=\/)/, '')
+
 test('python tools get the venv; commands that set one up do not', () => {
   expect(needsVenv('python train.py')).toBe(true)
   expect(needsVenv('cd code && pytest -q')).toBe(true)
@@ -19,7 +22,7 @@ test('a leading cd names the folder', () => {
 
 test('the command is prefixed with the nearest venv', async ($, on) => {
   on('session.cwd', () => ({ value: '/thesis/code/src' }))
-  on('fs.exists', ($, e) => ({ value: (e as unknown as { path: string }).path === '/thesis/code/.venv/bin/activate' }) as never)
+  on('fs.exists', ($, e) => ({ value: posix((e as unknown as { path: string }).path) === '/thesis/code/.venv/bin/activate' }) as never)
   on('process.run', () => ({ value: { exitCode: 0, stdout: '/Users/me', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   let ran = ''
   on('tool.call', ($, e) => {
@@ -33,7 +36,7 @@ test('the command is prefixed with the nearest venv', async ($, on) => {
 test('a folder name with shell characters stays a plain path', async ($, on) => {
   const dir = `/w/x"$(touch pwned)"'q`
   on('session.cwd', () => ({ value: dir }))
-  on('fs.exists', ($, e) => ({ value: (e as unknown as { path: string }).path === `${dir}/.venv/bin/activate` }) as never)
+  on('fs.exists', ($, e) => ({ value: posix((e as unknown as { path: string }).path) === `${dir}/.venv/bin/activate` }) as never)
   on('process.run', () => ({ value: { exitCode: 0, stdout: '/Users/me', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   let ran = ''
   on('tool.call', ($, e) => {
