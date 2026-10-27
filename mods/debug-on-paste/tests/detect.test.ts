@@ -8,3 +8,9 @@ test('stack traces count as errors; ordinary prompts do not', () => {
   expect(isError('fix the login screen please')).toBe(false)
   expect(isError('add an Error: label to the form')).toBe(false)
 })
+
+test('PowerShell errors count, in Windows PowerShell 5.1 and PowerShell 7 layouts', () => {
+  expect(isError("Get-Item : Cannot find path 'C:\\x' because it does not exist.\nAt line:1 char:1\n+ Get-Item C:\\x\n    + CategoryInfo          : ObjectNotFound: (C:\\x:String) [Get-Item], ItemNotFoundException")).toBe(true)
+  expect(isError("Get-Item: C:\\scripts\\a.ps1:3\nLine |\n   3 |  Get-Item C:\\x\n     |  ~~~~~~~~~~~~~\n     | Cannot find path 'C:\\x' because it does not exist.")).toBe(true)
+  expect(isError('in PowerShell, list the files\nthen sort them by size\nand show the top 5')).toBe(false)
+})
