@@ -16,21 +16,28 @@ export const checksIn = (pkgJson: string): string[] => {
   }
 }
 
-const tail = (s: string, n: number) => s.trim().split('\n').slice(-n).join('\n')
+export const isWindowsPath = (path: string): boolean => /^[A-Za-z]:[\\/]/.test(path)
+
+/** The argv to spawn: npm is a .cmd shim on Windows, which only cmd.exe can start. */
+export const shimArgv = (argv: string[], isWindows: boolean): string[] => (isWindows ? ['cmd.exe', '/d', '/c', ...argv] : argv)
+
+const tail = (s: string, n: number) => s.trim().split(/\r?\n/).slice(-n).join('\n')
 
 export const register: Register = on => {
-  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    if (!isPush(e.command)) return next(e)
-    const cwd = await $.session.cwd()
+  on('tool.call', { tool: /^(Bash|PowerShell)$/ }, async ($, e, next) => {
+    const command = e.tool === 'Bash' || e.tool === 'PowerShell' ? e.command : ''
+    if (!isPush(command)) return next(e)
+    const cwd = (await $.session.cwd()).replaceAll('\\', '/')
     const checks = checksIn(await ($.fs.read(`${cwd}/package.json`) as Promise<string>).catch(() => ''))
     if (checks.length === 0) return next(e)
     if (!(await $.fs.exists(`${cwd}/node_modules`))) {
       $.ui.toast('push-preflight: node_modules missing, checks skipped (npm install to enable)')
       return next(e)
     }
+    const isWindows = isWindowsPath(cwd)
     for (const check of checks) {
       $.ui.status(`push-preflight: ${check}…`)
-      const r = await $.process.run(['npm', 'run', '-s', check], { cwd, timeoutMs: 300_000 }).catch(() => null)
+      const r = await $.process.run(shimArgv(['npm', 'run', '-s', check], isWindows), { cwd, timeoutMs: 300_000 }).catch(() => null)
       if (!r || r.exitCode !== 0) {
         $.ui.status(undefined)
         $.ui.toast(`push-preflight: ${check} failed, push blocked`)
