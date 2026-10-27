@@ -22,6 +22,16 @@ Then merge the parts of [`settings.example.json`](settings.example.json) you wan
 
 A step-by-step guide with screenshots is in [`docs/setup-guide.pdf`](docs/setup-guide.pdf).
 
+### On Windows
+
+Run `./install.sh` from Git Bash. It installs everything the same way, and copies the PowerShell status line ([below](#status-line)) instead of the shell one.
+
+The mods work with both of Claude Code's shells on Windows, Bash (Git Bash) and PowerShell:
+- safety-guard also catches PowerShell and `cmd` deletes (`Remove-Item -Recurse`, `rd /s`), PowerShell writes to `.env` (`Set-Content`, `Out-File`) and `C:\` paths.
+- push-preflight, format-on-edit and venv-auto start `npm`, `dart`, `gradlew` and the venv's `Activate.ps1` the Windows way.
+- agent-panel shows background jobs' output and the file tree for `C:\` paths.
+- debug-on-paste recognises pasted PowerShell errors.
+
 ## Install one mod
 
 This repo is a Claude Code plugin marketplace. At the Claude Code prompt:
@@ -51,7 +61,7 @@ Mods are Claude Code plugins that change the interface or hook into what Claude 
 | **safety-guard** | Asks before force pushes, pushes to main, merges into main (`git merge` while on main, `gh pr merge`, the GitHub merge-PR tool), `rm -rf`, hard resets, `DROP`/`TRUNCATE`, `flyway clean` and `.env` edits or shell writes. Block is the default answer. |
 | **push-preflight** | Before `git push`, runs the repo's `format:check`, `lint` and `typecheck` scripts, and blocks the push if one fails. |
 | **format-on-edit** | After each edit, runs the project's own formatter (Prettier, `dart format` or Spotless), only where the project already uses one. |
-| **venv-auto** | Activates the nearest `.venv` for `python`, `pip` and `pytest` commands. |
+| **venv-auto** | Activates the nearest `.venv` for `python`, `pip`, `pytest` and `jupyter` commands, in Bash and PowerShell. |
 | **debug-on-paste** | When a pasted message looks like an error or stack trace, tells Claude to debug step by step. |
 
 <p>
@@ -88,6 +98,14 @@ cp statusline/statusline-command.sh ~/.claude/
 "statusLine": { "type": "command", "command": "sh ~/.claude/statusline-command.sh" }
 ```
 
+On Windows, [`statusline/statusline.ps1`](statusline/statusline.ps1) draws the same line in the same colors, set as 24-bit colors so it looks the same in Windows Terminal. It needs nothing else installed, and leaves out the PR badge. Copy it to `~/.claude/` (`%USERPROFILE%\.claude\`), then:
+
+```json
+"statusLine": { "type": "command", "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/<you>/.claude/statusline.ps1" }
+```
+
+`powershell` (Windows PowerShell 5.1) ran this about twice as fast as a Microsoft Store `pwsh` (0.4 s against 0.9 s), which matters because the line redraws often.
+
 ## CLAUDE.md
 
 [`CLAUDE.md`](CLAUDE.md) is my global instructions file (`~/.claude/CLAUDE.md`): short answers, no over-engineering, simplest code that works, read before claiming, and run outside feedback through the skill above.
@@ -121,7 +139,7 @@ See [WORKFLOW.md](WORKFLOW.md).
 .claude-plugin/marketplace.json   makes this repo installable with /plugin
 mods/<name>/                      one folder per mod (manifest, hooks, tests)
 plugins/verify-outside-feedback/  my skill, packaged as a plugin
-statusline/                       status line script
+statusline/                       status line scripts (sh, and PowerShell for Windows)
 CLAUDE.md                         my global instructions
 settings.example.json             the relevant parts of my settings.json
 install.sh                        installs everything

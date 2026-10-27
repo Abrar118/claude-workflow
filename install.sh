@@ -35,12 +35,22 @@ else
 fi
 
 echo "== Status line"
-if [ -f "$CLAUDE_DIR/statusline-command.sh" ]; then
-  cp "$CLAUDE_DIR/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh.bak"
-  echo "  backed up your old one to statusline-command.sh.bak"
+# Git Bash on Windows gets the PowerShell version: it needs no jq and draws the same colors in Windows Terminal.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) SL=statusline.ps1 ;;
+  *) SL=statusline-command.sh ;;
+esac
+if [ -f "$CLAUDE_DIR/$SL" ]; then
+  cp "$CLAUDE_DIR/$SL" "$CLAUDE_DIR/$SL.bak"
+  echo "  backed up your old one to $SL.bak"
 fi
-cp statusline/statusline-command.sh "$CLAUDE_DIR/statusline-command.sh"
-echo "  add the statusLine block from settings.example.json to ~/.claude/settings.json (needs jq; gh for the PR badge)"
+cp "statusline/$SL" "$CLAUDE_DIR/$SL"
+if [ "$SL" = statusline.ps1 ]; then
+  echo "  add this to ~/.claude/settings.json:"
+  echo "  \"statusLine\": { \"type\": \"command\", \"command\": \"powershell -NoProfile -ExecutionPolicy Bypass -File $(cygpath -m "$CLAUDE_DIR/$SL" 2>/dev/null || echo "$CLAUDE_DIR/$SL")\" }"
+else
+  echo "  add the statusLine block from settings.example.json to ~/.claude/settings.json (needs jq; gh for the PR badge)"
+fi
 
 echo "== CLAUDE.md"
 if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
