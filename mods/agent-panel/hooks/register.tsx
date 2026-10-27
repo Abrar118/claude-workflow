@@ -113,7 +113,8 @@ const describeCall = (e: Record<string, unknown>): string => {
 
 const shortTool = (t: string): string => t.replace(/^mcp__.*__/, '')
 const TASK_ID = /(?:ID|id)[:=]?\s+`?([A-Za-z0-9_-]{3,})/
-const OUTPUT_PATH = /(?:written to|output file|output)[:\s]+(\/[^\s'"`]+)/i
+// `/tmp/…/x.output`, or on Windows `C:\Users\…\x.output`.
+const OUTPUT_PATH = /(?:written to|output file|output)[:\s]+([A-Za-z]:[\\/][^\s'"`]+|\/[^\s'"`]+)/i
 const STOPPERS = ['TaskStop', 'KillShell', 'KillBash']
 
 // A background task's end notification names its id and says how it ended.
@@ -187,12 +188,26 @@ export const readCheck = (command: string, out: string, isError: boolean): Pick<
   return { isOk, summary: parts.join(', ') || (isOk ? 'ok' : 'failed'), firstFailure }
 }
 
-// The last lines a background task wrote; progress bars that redraw with \r keep only their last frame.
+// The last lines of a task's output; progress bars that redraw with \r keep only their last frame.
+export const lastLines = (text: string): string[] =>
+  text.replace(ANSI, '').split(/[\r\n]+/).map(l => l.trim()).filter(Boolean).slice(-4).map(l => l.slice(0, 160))
+
+// Windows reads the whole file each poll (it has no tail), so a bigger output shows no tail rather than stall.
+const MAX_READ_BYTES = 2_000_000
+export const isWindowsPath = (p: string): boolean => /^[A-Za-z]:[\\/]/.test(p)
+
+// The last lines a background task wrote.
 async function tailOf($: EngineInterface, path: string): Promise<string[]> {
-  if (!path.startsWith('/') || /[\r\n]/.test(path)) return []
+  if (/[\r\n]/.test(path)) return []
+  if (isWindowsPath(path)) {
+    const stat = await $.fs.stat(path).catch(() => null)
+    if (!stat || stat.kind !== 'file' || stat.size > MAX_READ_BYTES) return []
+    return lastLines(((await ($.fs.read(path) as Promise<string>).catch(() => '')) as string).slice(-3000))
+  }
+  if (!path.startsWith('/')) return []
   const r = await $.process.run(['tail', '-c', '3000', path]).catch(() => null)
   if (!r || r.exitCode !== 0) return []
-  return r.stdout.replace(ANSI, '').split(/[\r\n]+/).map(l => l.trim()).filter(Boolean).slice(-4).map(l => l.slice(0, 160))
+  return lastLines(r.stdout)
 }
 
 // `git status --porcelain` lines -> changed paths; a rename keeps its new name.
@@ -917,7 +932,9 @@ export const register: Register = on => {
       )
       if (status === 'done' && e.tool === 'Write') await update($, tree, l => (l.includes(path) ? l : [...l, path]))
     }
-    if (e.tool === 'Bash' && rec.run_in_background !== true && CHECK_CMD.test(String(rec.command ?? ''))) {
+    // A shell call: Bash, or PowerShell on Windows.
+    const isShell = e.tool === 'Bash' || e.tool === 'PowerShell'
+    if (isShell && rec.run_in_background !== true && CHECK_CMD.test(String(rec.command ?? ''))) {
       const command = String(rec.command).replace(/\s+/g, ' ').trim().slice(0, 100)
       const check: Check = { id, command, at: end, ...readCheck(command, text, status === 'failed') }
       await update($, checks, l => [...l, check].slice(-8))
@@ -925,7 +942,7 @@ export const register: Register = on => {
 
     // Started in the background by the model, or moved there by the person: either way the result names the task.
     const bgId = /background/i.test(text) ? TASK_ID.exec(text)?.[1] : undefined
-    const isBg = (e.tool === 'Bash' && rec.run_in_background === true) || e.tool === 'Monitor' || (e.tool === 'Bash' && !!bgId)
+    const isBg = (isShell && rec.run_in_background === true) || e.tool === 'Monitor' || (isShell && !!bgId)
     if (isBg && !(bgId && (await read($, jobs)).some(j => j.taskId === bgId))) {
       const label = String(rec.description || rec.command || rec.name || e.tool).replace(/\s+/g, ' ').trim()
       const job: Job = {
