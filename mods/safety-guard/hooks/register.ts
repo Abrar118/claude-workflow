@@ -6,6 +6,12 @@ const RISKY: [RegExp, string][] = [
   [/\bgit\b[^;&|\n]*?\spush\b[^;&|\n]*(\s--force\b|\s-[a-zA-Z]*f[a-zA-Z]*(?![\w-])|--force-with-lease|\s\+[\w./-])/, 'force push'],
   // -r / -R / -rf / -Rf / -r -f / --recursive anywhere in the flags; not `git rm`, not `docker run --rm`
   [/(?<![\w.-])(?<!\bgit\s)rm\s(?:[^;&|\n]*\s)?(-[fiIdv]*[rR][fiIrRdv]*|--recursive)(?![\w-])/, 'recursive delete'],
+  // PowerShell: Remove-Item and its aliases with -Recurse or any prefix of it, gci -Recurse | Remove-Item, .NET
+  [/(?<![\w.-])(?<!\bgit\s)(Remove-Item|rm|ri|del|erase|rmdir|rd)\s(?:[^;&|\n]*\s)?-(r|re|rec|recu|recur|recurs|recurse)(?![\w-])/i, 'recursive delete'],
+  [/\b(Get-ChildItem|gci|dir|ls)\b[^;\n]*\s-(r|re|rec|recu|recur|recurs|recurse)(?![\w-])[^;\n]*\|\s*(Remove-Item|rm|ri|del|erase)\b/i, 'recursive delete'],
+  [/\[(System\.)?IO\.Directory\]::Delete\([^)]*,\s*\$true\s*\)/i, 'recursive delete'],
+  // cmd: rd /s, rmdir /s, del /s (also glued, as in /q/s)
+  [/(?<![\w.-])(rd|rmdir|del|erase)\s[^;&|\n]*?(?<=\s|\/[a-z])\/s(?!\w)/i, 'recursive delete'],
   [/\bgit\b[^;&|\n]*?\sreset\s+--hard\b/, 'hard reset'],
   [/\bgit\b[^;&|\n]*?\s(clean\s+-[a-zA-Z]*f|checkout\s+--\s+\.)/, 'discard local files'],
   [/\b(DROP|TRUNCATE)\s+(TABLE|DATABASE|SCHEMA)\b/i, 'destructive SQL'],
@@ -21,37 +27,57 @@ const RISKY: [RegExp, string][] = [
 const MERGE = /\bgit\b[^;&|\n]*?\smerge(?![\w-])(?!\s+--(abort|quit)\b)/
 // Where a shell redirect or tee writes: `> .env`, `>> /p/.env.local`, `tee -a ".env"`. Not `2>&1`.
 const WRITE_TARGET = /(?:[^<>&\d]>>?|\btee(?:\s+-a)?)\s*["']?([^\s;&|"'<>]+)/g
+// PowerShell's writing cmdlets and the arguments after them, up to the next command.
+const PS_WRITE = /\b(?:Set-Content|Add-Content|Out-File|Tee-Object)\b([^;|\n]*)/gi
 // `docker compose up` on the default file, or a named file that is not the dev one.
 const PROD_COMPOSE = /(^|[;&|(]\s*|\bsudo\s+)docker[- ]compose\b(?![^;&|]*\s-f\s+\S*dev)[^;&|]*\bup\b/
 // No refspec named, so it pushes the current branch: any flags or remote, optional HEAD and redirects.
 const BARE_PUSH = /\bgit\b[^;&|\n]*?\spush(\s+-\S+)*(\s+(?!-)[^\s;&|]+(\s+HEAD)?)?(\s+[12]?>>?&?\s*\S+)*\s*($|[;&|\n])/
-// .env and .env.local etc., but not the committed .env.example / .sample / .template
-const ENV_FILE = /(^|\/)\.env(?!\.(example|sample|template)$)(\.[^/]+)?$/i
+// .env and .env.local etc. on either slash, but not the committed .env.example / .sample / .template
+const ENV_FILE = /(^|[\\/])\.env(?!\.(example|sample|template)$)(\.[^\\/]+)?$/i
 export const isEnvFile = (path: string) => ENV_FILE.test(path)
 
+// Bash `\` and PowerShell backtick line continuations join one command.
+const joined = (command: string) => command.replace(/[`\\]\r?\n/g, ' ')
 // Separators inside quotes don't end a command: blank them so `git -c "a;b" push` still reads as one command.
 // Checks run on both forms and a match on either counts, so blanking can only widen what is caught.
 const flat = (command: string) => command.replace(/"[^"]*"|'[^']*'/g, q => q.replace(/[;&|\n]/g, ' '))
-const either = (r: RegExp, command: string) => r.test(command) || r.test(flat(command))
+const either = (r: RegExp, command: string) => {
+  const c = joined(command)
+  return r.test(c) || r.test(flat(c))
+}
 
-export const writesEnvFile = (command: string) => [...command.matchAll(WRITE_TARGET)].some(m => isEnvFile(m[1]!))
+const unquote = (s: string) => s.replace(/^["']|["']$/g, '')
+export const writesEnvFile = (command: string) => {
+  const c = joined(command)
+  return (
+    [...c.matchAll(WRITE_TARGET)].some(m => isEnvFile(m[1]!)) ||
+    [...c.matchAll(PS_WRITE)].some(m => m[1]!.split(/\s+/).some(arg => isEnvFile(unquote(arg))))
+  )
+}
 export const isMerge = (command: string) => either(MERGE, command)
 export const risk = (command: string) =>
   RISKY.find(([r]) => either(r, command))?.[1] ?? (writesEnvFile(command) ? '.env write' : undefined)
-export const isProdCompose = (command: string) => PROD_COMPOSE.test(command)
+export const isProdCompose = (command: string) => PROD_COMPOSE.test(joined(command))
 export const isBarePush = (command: string) => either(BARE_PUSH, command)
 
 // Risks that depend on where the command runs: the branch it pushes, or a folder with a dev compose file.
 // The folder the command runs in: one leading `cd <dir> &&`, else the session's folder.
 // Null (unknown, so the guard asks) for any other way of changing folder or repo:
-// a later or second cd, pushd, any -C or --chdir (git -C, env -C), --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE.
-const ELSEWHERE = /\bpushd\b|\s-C\b|--chdir\b|--git-dir\b|--work-tree\b|\bGIT_(DIR|WORK_TREE)=/
-const dirOf = (command: string, cwd: string): string | null => {
-  const cds = (command.match(/(?<![\w.-])cd(?![\w.-])/g) ?? []).length
-  const m = /^\s*cd\s+("([^"]+)"|'([^']+)'|(\S+))\s*&&/.exec(command)
-  if (ELSEWHERE.test(command) || cds > 1 || (cds === 1 && !m)) return null
-  const dir = m ? (m[2] ?? m[3] ?? m[4]!) : ''
-  return !dir ? cwd : dir.startsWith('/') ? dir : `${cwd}/${dir}`
+// a later or second cd, pushd, any -C or --chdir (git -C, env -C), --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE,
+// and PowerShell's Set-Location / Push-Location (and their aliases) or $env:GIT_DIR.
+const ELSEWHERE = /\bpushd\b|\s-C\b|--chdir\b|--git-dir\b|--work-tree\b|\bGIT_(DIR|WORK_TREE)=|\$env:GIT_(DIR|WORK_TREE)\b/
+// git's -C is case-sensitive (-c sets config); the PowerShell cmdlets are not.
+const ELSEWHERE_PS = /(?<![\w.-])(Push-Location|Set-Location|sl|chdir)(?![\w.-])/i
+const toSlash = (p: string) => p.replace(/\\/g, '/').replace(/(.)\/+$/, '$1')
+export const dirOf = (command: string, cwd: string): string | null => {
+  const c = joined(command)
+  const cds = (c.match(/(?<![\w.-])cd(?![\w.-])/gi) ?? []).length
+  // cmd's `cd /d D:\x` changes drive too.
+  const m = /^\s*cd\s+(?:\/d\s+)?("([^"]+)"|'([^']+)'|(\S+))\s*&&/i.exec(c)
+  if (ELSEWHERE.test(c) || ELSEWHERE_PS.test(c) || cds > 1 || (cds === 1 && !m)) return null
+  const dir = m ? toSlash(m[2] ?? m[3] ?? m[4]!) : ''
+  return !dir ? cwd : /^([A-Za-z]:)?\//.test(dir) ? dir : `${cwd}/${dir}`
 }
 
 // The checked-out branch, or null when git can't tell.
@@ -62,7 +88,7 @@ async function branchIn($: EngineInterface, dir: string | null): Promise<string 
 }
 
 async function contextRisk($: EngineInterface, command: string): Promise<string | undefined> {
-  const cwd = await $.session.cwd()
+  const cwd = toSlash(await $.session.cwd())
   const dir = dirOf(command, cwd)
   if (isBarePush(command)) {
     const branch = await branchIn($, dir)
@@ -79,7 +105,7 @@ async function contextRisk($: EngineInterface, command: string): Promise<string 
 }
 
 export const register: Register = on => {
-  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+  on('tool.call', { tool: ['Bash', 'PowerShell'] }, async ($, e, next) => {
     const what = risk(e.command) ?? (await contextRisk($, e.command))
     if (!what) return next(e)
     // Block first: it is the focused option, so a reflexive Enter is the safe answer.
