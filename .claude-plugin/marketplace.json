@@ -12,7 +12,7 @@
     { "name": "safety-guard", "source": "./mods/safety-guard", "description": "Asks before force pushes, pushes and merges into main, PR merges, rm -rf, hard resets, DROP statements and .env writes." },
     { "name": "push-preflight", "source": "./mods/push-preflight", "description": "Runs the repo's format, lint and typecheck scripts before git push." },
     { "name": "format-on-edit", "source": "./mods/format-on-edit", "description": "Runs the project's own formatter on each edited file." },
-    { "name": "venv-auto", "source": "./mods/venv-auto", "description": "Activates the nearest .venv for python, pip and pytest." },
+    { "name": "venv-auto", "source": "./mods/venv-auto", "description": "Activates the nearest .venv for python, pip, pytest and jupyter, in Bash and PowerShell." },
     { "name": "debug-on-paste", "source": "./mods/debug-on-paste", "description": "Pasted error or stack trace? Tells Claude to debug systematically." },
     { "name": "verify-outside-feedback", "source": "./plugins/verify-outside-feedback", "description": "Skill: check each claim in pasted feedback with evidence before agreeing." }
   ]

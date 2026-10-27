@@ -1,10 +1,13 @@
 import { expect, test } from 'claude-code/testing'
 
+// On Windows the engine hands fs hooks native paths (`/app/x` arrives as `C:\app\x`): compare in POSIX form.
+const posix = (p: string) => p.replaceAll('\\', '/').replace(/^[A-Za-z]:(?=\/)/, '')
+
 const FILES = new Set(['/app/package.json', '/app/node_modules/.bin/prettier', '/flutter/pubspec.yaml'])
 
 test('an edit is formatted by the project prettier and Claude is told to re-read it', async ($, on) => {
   on('session.cwd', () => ({ value: '/' }))
-  on('fs.exists', ($, e) => ({ value: FILES.has((e as unknown as { path: string }).path) }) as never)
+  on('fs.exists', ($, e) => ({ value: FILES.has(posix((e as unknown as { path: string }).path)) }) as never)
   const runs: string[][] = []
   on('process.run', ($, e) => {
     const argv = (e as unknown as { argv: string[] }).argv
@@ -30,7 +33,7 @@ test('an edit is formatted by the project prettier and Claude is told to re-read
 test('only files inside the session folder are formatted, by a project inside it', async ($, on) => {
   on('session.cwd', () => ({ value: '/work/app' }))
   const files = new Set(['/work/package.json', '/work/node_modules/.bin/prettier', '/other/package.json', '/other/node_modules/.bin/prettier'])
-  on('fs.exists', ($, e) => ({ value: files.has((e as unknown as { path: string }).path) }) as never)
+  on('fs.exists', ($, e) => ({ value: files.has(posix((e as unknown as { path: string }).path)) }) as never)
   const runs: string[][] = []
   on('process.run', ($, e) => {
     runs.push((e as unknown as { argv: string[] }).argv)
@@ -47,7 +50,7 @@ test('only files inside the session folder are formatted, by a project inside it
 test('a path that climbs out with .. is not formatted', async ($, on) => {
   on('session.cwd', () => ({ value: '/work/app' }))
   const files = new Set(['/other/package.json', '/other/node_modules/.bin/prettier', '/work/app/../../other/package.json', '/work/app/../../other/node_modules/.bin/prettier'])
-  on('fs.exists', ($, e) => ({ value: files.has((e as unknown as { path: string }).path) }) as never)
+  on('fs.exists', ($, e) => ({ value: files.has(posix((e as unknown as { path: string }).path)) }) as never)
   const runs: string[][] = []
   on('process.run', ($, e) => {
     runs.push((e as unknown as { argv: string[] }).argv)

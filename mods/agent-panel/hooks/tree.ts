@@ -20,10 +20,13 @@ type Node = { name: string; path: string; dirs: Map<string, Node>; files: string
 
 const MAX_CHILDREN = 40
 
-/** A path relative to `root`; unchanged when outside it. */
+/** A path relative to `root`, with forward slashes; unchanged (slashes aside) when outside it. Windows paths compare without case. */
 export function toRelative(path: string, root: string): string {
-  const r = root.replace(/\/$/, '')
-  return r && path.startsWith(r + '/') ? path.slice(r.length + 1) : path
+  const p = path.replace(/\\/g, '/')
+  const r = root.replace(/\\/g, '/').replace(/\/$/, '')
+  const isWindows = /^[A-Za-z]:\//.test(r)
+  const [pp, rr] = isWindows ? [p.toLowerCase(), r.toLowerCase()] : [p, r]
+  return r && pp.startsWith(rr + '/') ? p.slice(r.length + 1) : p
 }
 
 export function countLines(text: unknown): number {
