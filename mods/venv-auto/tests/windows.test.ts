@@ -4,7 +4,8 @@ import type { On } from 'claude-code'
 import { activated, dirOf, needsVenv } from '../hooks/register'
 
 // The engine hands fs hooks the path in the platform's own spelling, so venvs are compared with forward slashes.
-const slashed = (p: string) => p.replaceAll('\\', '/')
+// On macOS/Linux the engine resolves `C:/x` against its own folder (`/repo/C:/x`), so drop what comes before the drive.
+const slashed = (p: string) => p.replaceAll('\\', '/').replace(/^.*?\/(?=[A-Za-z]:\/)/, '')
 
 /** Venv activate scripts on disk; records each probe and the command that ran. */
 function world(on: On, cwd: string, scripts: string[]) {

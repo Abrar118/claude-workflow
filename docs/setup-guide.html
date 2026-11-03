@@ -1,0 +1,173 @@
+<!doctype html>
+<!-- Source of setup-guide.pdf. Rebuild from the repo root on macOS:
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --no-pdf-header-footer --allow-file-access-from-files --print-to-pdf=docs/setup-guide.pdf "file://$PWD/docs/setup-guide.html"
+-->
+<html><head><meta charset="utf-8"><title>claude-workflow setup guide</title>
+<style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font: 10.5pt/1.5 -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1d1d20; }
+h1 { font-size: 24pt; margin: 0 0 4px; }
+h2 { font-size: 15pt; margin: 22px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; page-break-after: avoid; }
+h3 { font-size: 11.5pt; margin: 14px 0 4px; page-break-after: avoid; }
+.sub { color: #666; margin: 0 0 18px; }
+code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; }
+code { background: #f2f2f4; padding: 1px 4px; border-radius: 3px; }
+pre { background: #1d1d20; color: #e6e6e6; padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; page-break-inside: avoid; }
+pre code { background: none; padding: 0; color: inherit; }
+img { max-width: 100%; border-radius: 6px; border: 1px solid #ccc; }
+figure { margin: 10px 0; page-break-inside: avoid; }
+figcaption { font-size: 9pt; color: #666; }
+.row { display: flex; gap: 8px; }
+.row figure { flex: 1; }
+table { border-collapse: collapse; width: 100%; font-size: 9.5pt; }
+tr { page-break-inside: avoid; }
+td, th { border: 1px solid #ddd; padding: 4px 6px; text-align: left; vertical-align: top; }
+th { background: #f4f4f6; }
+.break { page-break-before: always; }
+.note { background: #fff7e6; border-left: 3px solid #e8a33d; padding: 6px 10px; }
+</style></head><body>
+
+<h1>claude-workflow</h1>
+<p class="sub">How to copy Abrar118's Claude Code setup exactly · github.com/Abrar118/claude-workflow</p>
+
+<figure><img src="screenshots/overview.png"><figcaption>The full setup: chat on the left, agent-panel on the right, prompt-deck band above the prompt, status line at the bottom.</figcaption></figure>
+
+<h2>1. What you get</h2>
+<table>
+<tr><th>Part</th><th>What it is</th></tr>
+<tr><td>12 mods</td><td>Claude Code plugins that add panes, bands, reminders and guards. Built by me.</td></tr>
+<tr><td>verify-outside-feedback</td><td>A skill that checks pasted feedback claim by claim. Built by me.</td></tr>
+<tr><td>Status line</td><td>Two-line status bar: a shell script for macOS/Linux, a PowerShell script for Windows.</td></tr>
+<tr><td>CLAUDE.md</td><td>My global instructions for Claude.</td></tr>
+<tr><td>Third-party plugins</td><td>superpowers, frontend-design, ui-ux-pro-max, impeccable and others, installed from their own sources.</td></tr>
+</table>
+
+<h2>2. Before you start</h2>
+<ul>
+<li>Claude Code (terminal CLI), signed in.</li>
+<li>macOS/Linux: <code>git</code>, <code>jq</code> (status line) and optionally <code>gh</code> (PR badge in the status line).</li>
+<li>Windows: Git Bash (to run the install script). The PowerShell status line needs nothing else.</li>
+<li>Python 3 for ui-ux-pro-max's search script.</li>
+<li>Optional, for the same look: the <b>Kitty</b> terminal with a dark theme whose background is <code>#1d1d20</code>.</li>
+</ul>
+
+<h2>3. Install everything (recommended)</h2>
+<pre><code>git clone https://github.com/Abrar118/claude-workflow.git
+cd claude-workflow
+./install.sh</code></pre>
+<p>The script adds the marketplaces, installs every mod, my skill and the third-party plugins, clones Uncodixfy, copies the status line, and copies <code>CLAUDE.md</code> only if you don't have one yet. On Windows, run it from Git Bash; it copies the PowerShell status line instead.</p>
+<p>Then merge these two blocks into <code>~/.claude/settings.json</code>:</p>
+<pre><code>"statusLine": { "type": "command", "command": "sh ~/.claude/statusline-command.sh" },
+"skillOverrides": { "uncodixfy": "user-invocable-only" }</code></pre>
+<p>The second keeps Uncodixfy opt-in: it loads only when you type <code>/uncodixfy</code>. Restart Claude Code. Settings I also use (optional): <code>"model": "opus"</code>, <code>"effortLevel": "high"</code>, <code>"tui": "fullscreen"</code>. They're all in <code>settings.example.json</code>.</p>
+
+<h2>4. Or install piece by piece</h2>
+<p>At the Claude Code prompt, for any mod or the skill:</p>
+<pre><code>/plugin install &lt;name&gt; --marketplace Abrar118/claude-workflow</code></pre>
+<p>Answer <code>y</code> to add the marketplace, then press Enter for the user scope. From a shell: <code>claude plugin install &lt;name&gt; --marketplace Abrar118/claude-workflow</code>.</p>
+<p>In the desktop app: click + next to the prompt box → Plugins → Add marketplace → <code>Abrar118/claude-workflow</code> → Add plugin.</p>
+
+<h3>Alternative: run the mods from a folder (how I run them)</h3>
+<p>Copy the mod folders and point Claude Code at them. Edits then reload live.</p>
+<pre><code>mkdir -p ~/.claude/mods &amp;&amp; cp -R mods/* ~/.claude/mods/</code></pre>
+<p>In <code>~/.claude/settings.json</code>, list each folder, separated by <code>:</code> (<code>;</code> on Windows):</p>
+<pre><code>"env": {
+  "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/agent-panel:~/.claude/mods/assumption-log:~/.claude/mods/progress-guard:~/.claude/mods/prompt-deck:~/.claude/mods/prompt-queue:~/.claude/mods/turn-meter:~/.claude/mods/limit-guard:~/.claude/mods/safety-guard:~/.claude/mods/push-preflight:~/.claude/mods/format-on-edit:~/.claude/mods/venv-auto:~/.claude/mods/debug-on-paste",
+  "CLAUDE_CODE_PLUGIN_DIR_WATCH": "1"
+}</code></pre>
+<p class="note">Use one method or the other, not both, or each mod loads twice.</p>
+
+<h2 class="break">5. The mods</h2>
+
+<h3>agent-panel</h3>
+<p>A side pane with tasks, background jobs, agents, assumptions and a live file tree, plus a progress bar above the prompt. Claude reports its plan through the <code>progress</code> tool, and subagents through <code>step</code>. Open it with <code>/subagents</code>.</p>
+<div class="row">
+<figure><img src="screenshots/agent-panel.png"><figcaption>Three agents running: model, effort, context use, current command.</figcaption></figure>
+<figure><img src="screenshots/assumption-log.png"><figcaption>assumption-log: mark each assumption Right, Wrong or Change.</figcaption></figure>
+</div>
+
+<h3>progress-guard</h3>
+<p>Keeps agent-panel's task list honest. After every 3 tool calls without a <code>progress</code> update it reminds Claude to update the list (or to start one for a task of 3 or more steps), and it shows a toast when a turn ends with the list still open. Install it together with agent-panel.</p>
+
+<h3>assumption-log</h3>
+<p>Claude calls an <code>assume</code> tool whenever it picks something you didn't say. Open the pane with <code>/assumptions</code>, then mark each one right or wrong, or ask for a change. The verdict goes back to Claude.</p>
+
+<h3>prompt-queue</h3>
+<p><code>/add-queue &lt;idea&gt;</code> saves a prompt while Claude works. <code>/queue</code> opens the pane, where you can Send, Modify or Discard each one.</p>
+<figure><img src="screenshots/prompt-queue.png"><figcaption>The Queue tab, with one waiting idea.</figcaption></figure>
+
+<h3>prompt-deck + turn-meter</h3>
+<p>A band above the prompt showing context, 5-hour and weekly usage, cost, how long the prompt cache stays warm, the last turn's time and cost, and a suggested next prompt (<code>s</code> to send, <code>e</code> to edit). <code>/limits</code> opens the details. turn-meter measures each turn and prompt-deck shows it, so install both. In the config menu you can set the cache length to 60 or 5 minutes.</p>
+<figure><img src="screenshots/prompt-deck.png"><figcaption>The prompt-deck band.</figcaption></figure>
+
+<h3>Guards and helpers (no screen)</h3>
+<table>
+<tr><th>Mod</th><th>What it does</th></tr>
+<tr><td>safety-guard</td><td>Asks before force pushes, pushes to main, merges into main (<code>git merge</code> on main, <code>gh pr merge</code>, the GitHub merge-PR tool), <code>rm -rf</code> and PowerShell/<code>cmd</code> recursive deletes, hard resets, <code>DROP</code>/<code>TRUNCATE</code>, <code>flyway clean</code> and <code>.env</code> writes. Block is the default answer, and when it can't tell which branch a command touches, it asks.</td></tr>
+<tr><td>limit-guard</td><td>Warns as the 5-hour limit fills up; asks before starting subagents when it's nearly used up.</td></tr>
+<tr><td>push-preflight</td><td>Runs <code>format:check</code>, <code>lint</code> and <code>typecheck</code> before <code>git push</code>, and blocks the push if one fails.</td></tr>
+<tr><td>format-on-edit</td><td>Runs the project's own formatter (Prettier, dart format, Spotless) after each edit, only for files inside the folder you're working in.</td></tr>
+<tr><td>venv-auto</td><td>Activates the nearest <code>.venv</code> for python, py, pip, pytest and jupyter, in Bash and PowerShell.</td></tr>
+<tr><td>debug-on-paste</td><td>Pasted error or stack trace (PowerShell errors too) → Claude debugs step by step.</td></tr>
+</table>
+
+<h3>On Windows</h3>
+<p>The mods work in both of Claude Code's Windows shells, Git Bash and PowerShell: safety-guard also catches <code>Remove-Item -Recurse</code>, <code>rd /s</code>, <code>Set-Content</code>/<code>Out-File</code> writes to <code>.env</code> and <code>C:\</code> paths; push-preflight, format-on-edit and venv-auto start their tools the Windows way; agent-panel shows <code>C:\</code> file trees and job output.</p>
+
+<h3>Matching the colors</h3>
+<p>The panes use my Kitty theme's colors (background <code>#1d1d20</code>). They're constants near the top of each mod's <code>hooks/register.tsx</code>; edit them to match your terminal.</p>
+
+<h2 class="break">6. Status line</h2>
+<figure><img src="screenshots/statusline.png"><figcaption>Model and effort · repo · context bar · 5h usage and reset · weekly usage (plus branch and open PR when there is one).</figcaption></figure>
+<pre><code>cp statusline/statusline-command.sh ~/.claude/</code></pre>
+<p>On Windows, copy <code>statusline/statusline.ps1</code> to <code>%USERPROFILE%\.claude\</code> and use:</p>
+<pre><code>"statusLine": { "type": "command", "command": "powershell -NoProfile -ExecutionPolicy Bypass -File C:/Users/&lt;you&gt;/.claude/statusline.ps1" }</code></pre>
+<p>It draws the same line in the same colors, without the PR badge.</p>
+
+<h2>7. My CLAUDE.md</h2>
+<p>Put this at <code>~/.claude/CLAUDE.md</code> (or merge it into yours):</p>
+<pre><code># Global Instructions
+
+## Tools
+- **Use ripgrep (`rg`) instead of `grep`** for all search operations in Bash commands. It's installed and preferred.
+
+## Outside feedback
+- When I paste a review, critique or suggestions (code, research, plans, anything), use the `verify-outside-feedback` skill: give each claim a Confirmed / Refuted / Unclear verdict with evidence before agreeing or changing anything. Never name or guess the source.
+
+## Working Preferences
+- Provide concise, focused responses. Skip non-essential context; keep examples minimal. (Override per-request when you want depth.)
+- Don't spawn a subagent for work doable directly in one response. Spawn multiple subagents in one turn when fanning out across items or reading multiple files.
+- Never claim things about code you haven't opened. If a specific file is referenced, read it before answering.
+- Avoid over-engineering. Only make changes directly requested or clearly necessary — no unrequested features, refactors, abstractions, or defensive code for impossible cases.
+- Simplest code that works: first ask if it needs to exist, then reuse what's in the codebase, then stdlib, then native platform features, then installed deps; never add a dependency for a few lines. Read and trace the problem fully before picking the small fix; fix bugs at the root, in the shared function, not per caller. Non-trivial logic leaves one small runnable check. Never simplify away validation, security, data-loss error handling or accessibility.</code></pre>
+
+<h2>8. Third-party plugins and skills</h2>
+<table>
+<tr><th>Plugin / skill</th><th>Install</th></tr>
+<tr><td>superpowers, frontend-design, security-guidance, claude-md-management, claude-code-setup, remember, github</td><td><code>/plugin install &lt;name&gt;@claude-plugins-official</code></td></tr>
+<tr><td>ui-ux-pro-max (nextlevelbuilder)</td><td><code>/plugin install ui-ux-pro-max --marketplace nextlevelbuilder/ui-ux-pro-max-skill</code></td></tr>
+<tr><td>impeccable (pbakaus)</td><td>See github.com/pbakaus/impeccable</td></tr>
+<tr><td>design-system (claudekit)</td><td><code>npm i -g ui-ux-pro-max-cli &amp;&amp; uipro init --global</code></td></tr>
+<tr><td>Uncodixfy (cyxzdev)</td><td><code>git clone https://github.com/cyxzdev/Uncodixfy ~/.claude/skills/uncodixfy</code>, then the <code>skillOverrides</code> block from section 3</td></tr>
+</table>
+<p>Also installed but used less often: feature-dev, code-review, pr-review-toolkit, code-simplifier and swift-lsp from the official marketplace. These all belong to their authors and are under their own licenses.</p>
+
+<h2>9. My workflow</h2>
+<ol>
+<li><b>Idea:</b> describe the goal; <code>superpowers:brainstorming</code> asks questions until it's clear.</li>
+<li><b>Plan:</b> numbered tasks appear in agent-panel with a progress bar; progress-guard keeps the list current.</li>
+<li><b>Build:</b> test-first; assumption-log captures every guess for review.</li>
+<li><b>Queue:</b> new ideas go to prompt-queue instead of interrupting.</li>
+<li><b>Debug:</b> paste the error; debug-on-paste starts systematic debugging.</li>
+<li><b>Review:</b> <code>/code-review</code>; outside feedback goes through verify-outside-feedback.</li>
+<li><b>Ship:</b> format-on-edit, push-preflight and safety-guard keep the push clean; pushes and merges into main need my OK.</li>
+</ol>
+
+<h2>10. Troubleshooting</h2>
+<ul>
+<li><b>A mod doesn't appear:</b> run <code>claude plugin list</code>, then <code>/reload-plugins</code> or restart.</li>
+<li><b>Mods load twice:</b> you installed from the marketplace <i>and</i> set <code>CLAUDE_CODE_PLUGIN_DIRS</code>. Remove one.</li>
+<li><b>Status line is blank:</b> install <code>jq</code> (macOS/Linux); check the path in <code>settings.json</code>.</li>
+<li><b>See why a hook failed:</b> start with <code>claude --debug</code>.</li>
+</ul>
+</body></html>

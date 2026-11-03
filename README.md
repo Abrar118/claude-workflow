@@ -157,7 +157,7 @@ statusline/                       status line scripts (sh, and PowerShell for Wi
 CLAUDE.md                         my global instructions
 settings.example.json             the relevant parts of my settings.json
 install.sh                        installs everything
-docs/                             screenshots and the PDF setup guide
+docs/                             screenshots, the PDF setup guide and its HTML source
 ```
 
 ## Developing the mods

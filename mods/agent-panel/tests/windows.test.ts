@@ -38,7 +38,8 @@ test('on Windows, PowerShell checks, background jobs and their output tail show 
     spawned.push(e.argv[0]!)
     return { value: { exitCode: 1, stdout: '', stderr: '' } } as never
   })
-  const slashed = (p: string) => p.replace(/\\/g, '/')
+  // On macOS/Linux the engine resolves `C:/x` against its own folder (`/repo/C:/x`), so drop what comes before the drive.
+  const slashed = (p: string) => p.replace(/\\/g, '/').replace(/^.*?\/(?=[A-Za-z]:\/)/, '')
   on('fs.stat' as never, (_: unknown, e: { path: string }) =>
     (slashed(e.path) === slashed(OUTPUT) ? { value: { kind: 'file', size: 40, mtimeMs: 0, isLink: false } } : { value: { kind: 'missing', size: 0, mtimeMs: 0, isLink: false } }) as never)
   on('fs.read' as never, () => ({ value: 'epoch 2/10\r\nepoch 3/10\r\n' }) as never)

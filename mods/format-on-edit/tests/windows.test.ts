@@ -6,7 +6,8 @@ import { inside, isAbsolute, prettierBin, shimArgv, toSlash } from '../hooks/reg
 type Run = { argv: string[]; cwd: string }
 
 // The engine hands fs hooks the path in the platform's own spelling, so the disk compares with forward slashes.
-const slashed = (p: string) => p.replaceAll('\\', '/')
+// On macOS/Linux the engine resolves `C:/x` against its own folder (`/repo/C:/x`), so drop what comes before the drive.
+const slashed = (p: string) => p.replaceAll('\\', '/').replace(/^.*?\/(?=[A-Za-z]:\/)/, '')
 
 /** A disk of `files` (path → text) in session folder `cwd`, recording each formatter run and each fs.exists probe. */
 function disk(on: On, files: Record<string, string>, stdout: (argv: string[]) => string, cwd: string) {

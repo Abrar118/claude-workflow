@@ -2,7 +2,8 @@ import { expect, test } from 'claude-code/testing'
 
 import { isPush, isWindowsPath, shimArgv } from '../hooks/register'
 
-const slashed = (p: string) => p.replaceAll('\\', '/')
+// On macOS/Linux the engine resolves `C:/x` against its own folder (`/repo/C:/x`), so drop what comes before the drive.
+const slashed = (p: string) => p.replaceAll('\\', '/').replace(/^.*?\/(?=[A-Za-z]:\/)/, '')
 
 test('npm is started through cmd.exe on Windows only', () => {
   expect(isWindowsPath('C:\\Users\\me\\fe')).toBe(true)
