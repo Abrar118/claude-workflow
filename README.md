@@ -1,6 +1,6 @@
 # claude-workflow
 
-My Claude Code setup: 11 mods I built, a skill I wrote, my global `CLAUDE.md`, my status line, and the third-party plugins I use. Copy all of it with one script, or install only the parts you want.
+My Claude Code setup: 12 mods I built, a skill I wrote, my global `CLAUDE.md`, my status line, and the third-party plugins I use. Copy all of it with one script, or install only the parts you want.
 
 ![Overview: chat on the left, activity pane on the right, usage band above the prompt](docs/screenshots/overview.png)
 
@@ -18,7 +18,7 @@ The script:
 - copies the status line script
 - copies `CLAUDE.md`, but only if you don't already have one; otherwise it's saved next to yours as `CLAUDE.workflow.md`
 
-Then merge the parts of [`settings.example.json`](settings.example.json) you want into `~/.claude/settings.json` (the status line block at least), and restart Claude Code.
+Then merge the `statusLine` and `skillOverrides` blocks from [`settings.example.json`](settings.example.json) into `~/.claude/settings.json`, plus any other settings you want, and restart Claude Code.
 
 A step-by-step guide with screenshots is in [`docs/setup-guide.pdf`](docs/setup-guide.pdf).
 
@@ -54,6 +54,7 @@ Mods are Claude Code plugins that change the interface or hook into what Claude 
 |---|---|
 | **agent-panel** | Side pane (`/subagents`) with tasks, background jobs, agents (model, effort, context use), assumptions and a live file tree. Adds a progress bar above the prompt and `progress`/`step` tools Claude uses to report its plan. |
 | **assumption-log** | Claude logs each assumption it makes with an `assume` tool. The Assumptions pane (`/assumptions`) lets you mark each one right or wrong, or ask for a change. |
+| **progress-guard** | Keeps agent-panel's task list honest: reminds Claude after every 3 tool calls without a progress update, and shows a toast when a turn ends with the list still open. Needs agent-panel. |
 | **prompt-deck** | Band above the prompt: context, 5h and weekly usage, session cost, prompt-cache countdown with a compact warning, git health and a suggested next prompt. `/limits` opens a pane. |
 | **prompt-queue** | `/add-queue` saves a prompt idea while Claude works. `/queue` opens a pane to send, modify or discard them. |
 | **turn-meter** | Time, tool calls and cost for each turn, shown in the prompt-deck band, plus a toast when a turn costs far more than usual. |
@@ -124,10 +125,23 @@ These aren't mine and aren't included here. Install them from their sources.
 | remember | official marketplace | Saves session state between sessions | `/plugin install remember@claude-plugins-official` |
 | github | official marketplace | GitHub MCP tools | `/plugin install github@claude-plugins-official` |
 | [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | nextlevelbuilder | Searchable styles, palettes and font pairings | `/plugin install ui-ux-pro-max --marketplace nextlevelbuilder/ui-ux-pro-max-skill` |
+| [impeccable](https://github.com/pbakaus/impeccable) | pbakaus ([impeccable.style](https://impeccable.style)) | Design direction, critique, polish and audits for frontend UI | See its README |
 | design-system | claudekit, via the [ui-ux-pro-max CLI](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | Design tokens and component specs | `npm i -g ui-ux-pro-max-cli && uipro init --global` |
-| [Uncodixfy](https://github.com/cyxzdev/Uncodixfy) | cyxzdev | Stops generic AI-looking UI | `git clone https://github.com/cyxzdev/Uncodixfy ~/.claude/skills/uncodixfy` |
+| [Uncodixfy](https://github.com/cyxzdev/Uncodixfy) | cyxzdev | Optional cleanup for restrained UI; invoke with `/uncodixfy` | `git clone https://github.com/cyxzdev/Uncodixfy ~/.claude/skills/uncodixfy`, then apply `skillOverrides` below |
 
-Also installed but used less often: `feature-dev`, `code-review`, `pr-review-toolkit` and `code-simplifier` from the official marketplace.
+Also installed but used less often: `feature-dev`, `code-review`, `pr-review-toolkit`, `code-simplifier` and `swift-lsp` from the official marketplace.
+
+### Keep Uncodixfy opt-in
+
+Merge this into `~/.claude/settings.json` so Claude only loads Uncodixfy when you invoke `/uncodixfy`:
+
+```json
+"skillOverrides": {
+  "uncodixfy": "user-invocable-only"
+}
+```
+
+Use it for a requested cleanup pass. Choose one primary design skill per task to avoid conflicting style rules. The override preserves the upstream skill files when you update them.
 
 ## How I use it all
 

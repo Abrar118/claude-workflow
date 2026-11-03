@@ -7,7 +7,7 @@ How I work with Claude Code day to day, and where each mod, skill and plugin fit
 | Step | What happens | What helps |
 |---|---|---|
 | 1. Idea | I describe what I want, often by voice. Claude asks questions until the goal is clear. | `superpowers:brainstorming` |
-| 2. Plan | Claude writes a plan with numbered tasks. The tasks show up in the side pane with a progress bar. | `superpowers:writing-plans`, **agent-panel** |
+| 2. Plan | Claude writes a plan with numbered tasks. The tasks show up in the side pane with a progress bar. | `superpowers:writing-plans`, **agent-panel**, **progress-guard** |
 | 3. Build | Claude works through the tasks test-first. It logs every guess it makes so I can mark it right or wrong without stopping it. | `superpowers:test-driven-development`, **assumption-log** |
 | 4. Queue | New ideas while Claude is busy go into a queue instead of interrupting. | **prompt-queue** (`/add-queue`) |
 | 5. Debug | When I paste an error, Claude switches to step-by-step debugging instead of guessing. | **debug-on-paste**, `superpowers:systematic-debugging` |

@@ -1,0 +1,8 @@
+{
+  "name": "progress-guard",
+  "version": "0.1.0",
+  "description": "Nudges Claude to keep the progress task list updated: reminders after 3 tool calls without an update, and a toast when a turn ends with the list open.",
+  "author": {
+    "name": "Abrar118"
+  }
+}

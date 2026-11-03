@@ -1,6 +1,9 @@
 {
   "model": "opus",
   "effortLevel": "high",
+  "skillOverrides": {
+    "uncodixfy": "user-invocable-only"
+  },
   "statusLine": {
     "type": "command",
     "command": "sh ~/.claude/statusline-command.sh"

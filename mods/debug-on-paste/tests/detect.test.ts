@@ -14,3 +14,9 @@ test('PowerShell errors count, in Windows PowerShell 5.1 and PowerShell 7 layout
   expect(isError("Get-Item: C:\\scripts\\a.ps1:3\nLine |\n   3 |  Get-Item C:\\x\n     |  ~~~~~~~~~~~~~\n     | Cannot find path 'C:\\x' because it does not exist.")).toBe(true)
   expect(isError('in PowerShell, list the files\nthen sort them by size\nand show the top 5')).toBe(false)
 })
+
+test('a long run of blank lines is checked quickly', () => {
+  const start = performance.now()
+  expect(isError(`a\n${'   \n'.repeat(20000)}x`)).toBe(false)
+  expect(performance.now() - start).toBeLessThan(200)
+})

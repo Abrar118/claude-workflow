@@ -14,7 +14,7 @@ claude plugin marketplace add anthropics/claude-plugins-official || true
 claude plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill || true
 
 echo "== My mods and skill"
-for p in agent-panel assumption-log prompt-deck prompt-queue turn-meter limit-guard \
+for p in agent-panel assumption-log progress-guard prompt-deck prompt-queue turn-meter limit-guard \
          safety-guard push-preflight format-on-edit venv-auto debug-on-paste verify-outside-feedback; do
   claude plugin install "$p@claude-workflow" -s user || echo "  ! $p failed"
 done
@@ -33,6 +33,7 @@ if [ ! -d "$CLAUDE_DIR/skills/uncodixfy" ]; then
 else
   echo "  already there"
 fi
+echo "  add the skillOverrides block from settings.example.json to ~/.claude/settings.json so /uncodixfy runs only when you invoke it"
 
 echo "== Status line"
 # Git Bash on Windows gets the PowerShell version: it needs no jq and draws the same colors in Windows Terminal.

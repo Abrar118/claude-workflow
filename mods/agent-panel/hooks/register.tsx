@@ -36,7 +36,7 @@ const RULE =
   'with `finished: true`. Skip it only when you already keep a TodoWrite/TaskCreate list.'
 const ACCENT = '#ff7800'
 const GLYPH: Record<RunStatus, string> = { running: '●', done: '✓', failed: '✗' }
-const COLOR: Record<RunStatus, string> = { running: ACCENT, done: 'green', failed: 'red' }
+const COLOR: Record<RunStatus, string> = { running: ACCENT, done: 'ansi256(10)', failed: 'ansi256(9)' }
 // Terminal colors: Claude's palette in mid tones, the same as prompt-deck's band.
 const T = { clay: ACCENT, ok: '#8ff0a4', bad: '#f66151', info: '#99c1f1', warn: '#ffa348', heather: '#dc8add', muted: '#9a9996', line: '#4f4f4f' } as const
 const MAX_TREE_ROWS = 150
@@ -1552,7 +1552,7 @@ export const register: Register = on => {
     const { Box, Text, Button } = $.ui.resolve(e)
 
     if (f) {
-      const color = f.isFinished ? 'green' : ACCENT
+      const color = f.isFinished ? 'ansi256(10)' : ACCENT
       const cols = e.props.bodyColumns
       const titleW = Math.max(8, Math.min(30, f.title.length + 2, Math.floor(cols / 3)))
       const width = Math.max(6, Math.min(40, cols - titleW - 32))
